@@ -9,40 +9,23 @@ ENV HOME /root
 # Use baseimage-docker's init process.
 CMD ["/sbin/my_init"]
 ENV DEBIAN_FRONTEND noninteractive
-# ...put your own build instructions here...
 RUN apt-get update
 # Update these packages
 RUN apt-get -y install git openssl ruby-dev
 RUN git clone https://github.com/mitre-cyber-academy/2014-web-300.git /home/app/web-300
-RUN chown -R app:app /home/app/web-300
 # Hack to correct for old box
 RUN echo :ssl_verify_mode: 0 >> ~/.gemrc
-WORKDIR /home/app/web-300
 ENV JRUBY_OPTS="--1.9 -Xcext.enabled=true"
-
+WORKDIR /home/app/web-300
 RUN bundle install
-RUN sudo -u app RAILS_ENV=production bundle exec rake assets:precompile
+# Update database settings to work with separate DB container
+RUN rm /home/app/web-300/config/database.yml
+ADD database.yml /home/app/web-300/config/database.yml
+RUN chown -R app:app /home/app/web-300
 RUN rm -f /etc/service/nginx/down
 RUN rm /etc/nginx/sites-enabled/default
 ADD web-300.conf /etc/nginx/sites-enabled/web-300.conf
-
-# If any environment variables need to be included 
-# /etc/nginx/main.d/postgres-env.conf:
-# env POSTGRES_PORT_5432_TCP_ADDR;
-# env POSTGRES_PORT_5432_TCP_PORT;
-
-# Dockerfile:
-# ADD postgres-env.conf /etc/nginx/main.d/postgres-env.conf
-# If nginx needs to be configured
-# /etc/nginx/main.d/secret_key.conf:
-# env SECRET_KEY=123456;
-
-# /etc/nginx/conf.d/gzip_max.conf:
-# gzip_comp_level 9;
-
-# Dockerfile:
-# ADD secret_key.conf /etc/nginx/main.d/secret_key.conf
-# ADD gzip_max.conf /etc/nginx/conf.d/gzip_max.conf
-
+ADD postgres-env.conf /etc/nginx/main.d/postgres-env.conf
+ADD rails-env.conf /etc/nginx/main.d/postgres-env.conf
 # Clean up APT when done.
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
